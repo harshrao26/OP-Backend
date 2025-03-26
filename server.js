@@ -21,7 +21,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Connect to MongoDB
 connectDB();
 
-app.use(cors({ origin: "http://localhost:5173", credentials: true })); // Adjust the origin
+app.use(cors({ origin: "https://op-frontend-wdaj.vercel.app", credentials: true })); // Adjust the origin
 app.use(express.json());
 
 
