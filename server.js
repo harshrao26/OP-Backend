@@ -8,6 +8,7 @@ import productRoutesSeller from "./routes/seller/productRoutesSeller.js";
 import productRouteCustomer from "./routes/customer/productRouteCustomer.js";
 import uploadRoutes from "./routes/uploadRoutes.js"; 
 import bodyParser from "body-parser";
+import {register} from './register.js'
 dotenv.config();
 
 const app = express();
@@ -34,6 +35,7 @@ app.use("/api/customer/products", productRouteCustomer);
 app.use("/api/seller/auth", sellerRoutes);
 app.use("/api/seller/products", productRoutesSeller);
 
+app.use("/api/verify/register", register);
 
 
 // Routes
