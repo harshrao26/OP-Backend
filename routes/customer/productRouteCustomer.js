@@ -134,4 +134,76 @@ router.delete("/cart/remove/:id", verifyCustomer, async (req, res) => {
 });
 
 
+router.post("/purchase", verifyCustomer, async (req, res) => {
+  try {
+    // Handle multiple products purchase if "products" array is provided
+    if (req.body.products && Array.isArray(req.body.products)) {
+      const purchaseList = req.body.products; // Expecting [{ productId, quantity }, ...]
+      if (purchaseList.length === 0) {
+        return res.status(400).json({ message: "No products provided for purchase." });
+      }
+
+      // First, verify all products for validity and sufficient stock
+      for (let item of purchaseList) {
+        const { productId, quantity } = item;
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+          return res.status(400).json({ message: `Invalid product ID: ${productId}` });
+        }
+        const qty = quantity ? parseInt(quantity) : 1;
+        const product = await Product.findById(productId);
+        if (!product) {
+          return res.status(404).json({ message: `Product not found: ${productId}` });
+        }
+        if (product.stock < qty) {
+          return res.status(400).json({ message: `Insufficient stock for product ${product.name}` });
+        }
+      }
+
+      // All validations passed: reduce stock for each product
+      const updatedProducts = [];
+      for (let item of purchaseList) {
+        const { productId, quantity } = item;
+        const qty = quantity ? parseInt(quantity) : 1;
+        const product = await Product.findById(productId);
+        product.stock -= qty;
+        await product.save();
+        updatedProducts.push({
+          productId: product._id,
+          name: product.name,
+          remaining_stock: product.stock,
+        });
+      }
+
+      return res.status(200).json({
+        message: "Purchase successful",
+        updatedProducts,
+      });
+    } else {
+      // Single product purchase handling
+      const { productId, quantity } = req.body;
+      const qty = quantity ? parseInt(quantity) : 1;
+      if (!mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ message: "Invalid Product ID" });
+      }
+      const product = await Product.findById(productId);
+      if (!product) return res.status(404).json({ message: "Product not found" });
+      if (product.stock < qty) {
+        return res.status(400).json({ message: "Insufficient stock" });
+      }
+      product.stock -= qty;
+      await product.save();
+      return res.status(200).json({
+        message: "Purchase successful",
+        product: product.name,
+        remaining_stock: product.stock,
+      });
+    }
+  } catch (error) {
+    console.error("Error processing purchase:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+
+
 export default router;

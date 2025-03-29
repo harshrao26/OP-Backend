@@ -1,12 +1,12 @@
 import express from "express";
 import Product from "../../models/Product.js";
-import { verifySeller, verifySeller2 } from "../../middleware/seller/authMiddleware.js";
+import { verifySeller, verifySeller2, isApproved } from "../../middleware/seller/authMiddleware.js";
 import Seller from "../../models/Seller.js";
 
 const router = express.Router();
 
 // Create a product (Only seller can post)
-router.post("/add", verifySeller, async (req, res) => {
+router.post("/add", verifySeller, isApproved, async (req, res) => {
   try {
     const { name, description, price, category, stock, images, brand } = req.body;
 

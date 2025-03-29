@@ -50,5 +50,19 @@ export const verifySeller2 = async (req, res, next) => {
     res.status(400).json({ success: false, message: "Invalid token" });
   }
 };
+export const isApproved = async (req, res, next) => {
+  try {
+    const seller = await Seller.findById(req.sellerId);
+    if (seller.accountStatus === "Approved") {
+      return next();
+    } else {
+      return res.status(403).json({ message: "Account not approved yet" });
+    }
+  } catch (error) {
+    console.error("Error fetching seller:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 

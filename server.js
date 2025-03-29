@@ -9,6 +9,7 @@ import productRouteCustomer from "./routes/customer/productRouteCustomer.js";
 import uploadRoutes from "./routes/uploadRoutes.js"; 
 import bodyParser from "body-parser";
 import {register} from './register.js'
+import adminRoutes from './routes/admin/adminRoutes.js'
 dotenv.config();
 
 const app = express();
@@ -37,6 +38,8 @@ app.use("/api/seller/products", productRoutesSeller);
 
 app.use("/api/verify/register", register);
 
+app.use('/api/admin', adminRoutes);
+
 
 // Routes
 app.use("/api/upload", uploadRoutes);
@@ -55,4 +58,3 @@ app.use("/api/products", productRoutesSeller);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
