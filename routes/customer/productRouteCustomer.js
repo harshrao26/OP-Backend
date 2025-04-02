@@ -1,5 +1,6 @@
 import express from "express";
 import Product from "../../models/Product.js";
+import Order from "../../models/Order.js";
 import { verifyCustomer } from "../../middleware/customer/customerAuth.js";
 import Cart from "../../models/Cart.js";
 const router = express.Router();
@@ -7,28 +8,27 @@ import jwt from "jsonwebtoken";
 import Customer from "../../models/Customer.js";
 import mongoose from "mongoose";
 router.get("/all", async (req, res) => {
-   
-      try {
-        const products = await Product.find(); // Fetch all products
-        res.status(200).json(products);
-      } catch (error) {
-        console.error("Error fetching products:", error.message);
-        res.status(500).json({ message: "Server error", error: error.message });
-      }
-  });
+  try {
+    const products = await Product.find(); // Fetch all products
+    res.status(200).json(products);
+  } catch (error) {
+    console.error("Error fetching products:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 // Get a single product by ID
 router.get("/:id", async (req, res) => {
-    try {
-      const product = await Product.findById(req.params.id);
-      if (!product) {
-        return res.status(404).json({ message: "Product not found" });
-      }
-      res.status(200).json(product);
-    } catch (error) {
-      console.error("Error fetching product:", error.message);
-      res.status(500).json({ message: "Server error", error: error.message });
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
-  });
+    res.status(200).json(product);
+  } catch (error) {
+    console.error("Error fetching product:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 
 // Get cart items for a customer
 router.get("/cart", verifyCustomer, async (req, res) => {
@@ -46,11 +46,10 @@ router.get("/cart", verifyCustomer, async (req, res) => {
   }
 });
 
-
 router.post("/cart/add-product", verifyCustomer, async (req, res) => {
   try {
     let { productId, quantity } = req.body;
-    const userId = req.user.id; 
+    const userId = req.user.id;
 
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.status(400).json({ message: "Invalid Product ID" });
@@ -87,8 +86,6 @@ router.post("/cart/add-product", verifyCustomer, async (req, res) => {
   }
 });
 
-
-
 router.post("/cart/update", async (req, res) => {
   try {
     const { productId, quantity } = req.body;
@@ -102,7 +99,9 @@ router.post("/cart/update", async (req, res) => {
     }
 
     // Check if product exists in cart
-    const productIndex = userCart.items.findIndex((item) => item.product.toString() === productId);
+    const productIndex = userCart.items.findIndex(
+      (item) => item.product.toString() === productId
+    );
 
     if (productIndex !== -1) {
       if (quantity > 0) {
@@ -122,7 +121,6 @@ router.post("/cart/update", async (req, res) => {
   }
 });
 
-
 // Remove item
 router.delete("/cart/remove/:id", verifyCustomer, async (req, res) => {
   try {
@@ -133,29 +131,38 @@ router.delete("/cart/remove/:id", verifyCustomer, async (req, res) => {
   }
 });
 
-
 router.post("/purchase", verifyCustomer, async (req, res) => {
   try {
     // Handle multiple products purchase if "products" array is provided
     if (req.body.products && Array.isArray(req.body.products)) {
       const purchaseList = req.body.products; // Expecting [{ productId, quantity }, ...]
       if (purchaseList.length === 0) {
-        return res.status(400).json({ message: "No products provided for purchase." });
+        return res
+          .status(400)
+          .json({ message: "No products provided for purchase." });
       }
 
       // First, verify all products for validity and sufficient stock
       for (let item of purchaseList) {
         const { productId, quantity } = item;
         if (!mongoose.Types.ObjectId.isValid(productId)) {
-          return res.status(400).json({ message: `Invalid product ID: ${productId}` });
+          return res
+            .status(400)
+            .json({ message: `Invalid product ID: ${productId}` });
         }
         const qty = quantity ? parseInt(quantity) : 1;
         const product = await Product.findById(productId);
         if (!product) {
-          return res.status(404).json({ message: `Product not found: ${productId}` });
+          return res
+            .status(404)
+            .json({ message: `Product not found: ${productId}` });
         }
         if (product.stock < qty) {
-          return res.status(400).json({ message: `Insufficient stock for product ${product.name}` });
+          return res
+            .status(400)
+            .json({
+              message: `Insufficient stock for product ${product.name}`,
+            });
         }
       }
 
@@ -186,7 +193,8 @@ router.post("/purchase", verifyCustomer, async (req, res) => {
         return res.status(400).json({ message: "Invalid Product ID" });
       }
       const product = await Product.findById(productId);
-      if (!product) return res.status(404).json({ message: "Product not found" });
+      if (!product)
+        return res.status(404).json({ message: "Product not found" });
       if (product.stock < qty) {
         return res.status(400).json({ message: "Insufficient stock" });
       }
@@ -204,6 +212,42 @@ router.post("/purchase", verifyCustomer, async (req, res) => {
   }
 });
 
+// Get Order by ID
+router.get("/:orderId", verifyCustomer, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    res.status(200).json({ order });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error });
+  }
+});
 
+// List Orders for a Customer
+router.get("/customer/:customerId", verifyCustomer, async (req, res) => {
+  try {
+    const orders = await Order.find({ customerId: req.params.customerId });
+    res.status(200).json({ orders });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error });
+  }
+});
+
+// Update Order Status (or Payment Status)
+router.put("/:orderId", verifyCustomer, async (req, res) => {
+  try {
+    const { status, paymentStatus } = req.body;
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (status) order.status = status;
+    if (paymentStatus) order.paymentStatus = paymentStatus;
+
+    await order.save();
+    res.status(200).json({ message: "Order updated successfully", order });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error });
+  }
+});
 
 export default router;
