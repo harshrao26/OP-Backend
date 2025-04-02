@@ -133,40 +133,38 @@ router.delete("/cart/remove/:id", verifyCustomer, async (req, res) => {
 
 router.post("/purchase", verifyCustomer, async (req, res) => {
   try {
-    // Handle multiple products purchase if "products" array is provided
+    // Common order fields required for both scenarios
+    const { sellerId, shippingAddress, paymentStatus, status } = req.body;
+    if (!sellerId || !shippingAddress) {
+      return res.status(400).json({ message: "Missing sellerId or shippingAddress" });
+    }
+
+    // Multiple products purchase
     if (req.body.products && Array.isArray(req.body.products)) {
       const purchaseList = req.body.products; // Expecting [{ productId, quantity }, ...]
       if (purchaseList.length === 0) {
-        return res
-          .status(400)
-          .json({ message: "No products provided for purchase." });
+        return res.status(400).json({ message: "No products provided for purchase." });
       }
 
-      // First, verify all products for validity and sufficient stock
+      let totalAmount = 0;
+      // Validate each product and calculate total
       for (let item of purchaseList) {
         const { productId, quantity } = item;
         if (!mongoose.Types.ObjectId.isValid(productId)) {
-          return res
-            .status(400)
-            .json({ message: `Invalid product ID: ${productId}` });
+          return res.status(400).json({ message: `Invalid product ID: ${productId}` });
         }
         const qty = quantity ? parseInt(quantity) : 1;
         const product = await Product.findById(productId);
         if (!product) {
-          return res
-            .status(404)
-            .json({ message: `Product not found: ${productId}` });
+          return res.status(404).json({ message: `Product not found: ${productId}` });
         }
         if (product.stock < qty) {
-          return res
-            .status(400)
-            .json({
-              message: `Insufficient stock for product ${product.name}`,
-            });
+          return res.status(400).json({ message: `Insufficient stock for product ${product.name}` });
         }
+        totalAmount += product.price * qty;
       }
 
-      // All validations passed: reduce stock for each product
+      // Reduce stock and prepare updatedProducts info
       const updatedProducts = [];
       for (let item of purchaseList) {
         const { productId, quantity } = item;
@@ -181,9 +179,24 @@ router.post("/purchase", verifyCustomer, async (req, res) => {
         });
       }
 
+      // Create and save the order
+      const orderData = {
+        customerId: req.user.id,
+        sellerId,
+        products: purchaseList,
+        totalAmount,
+        shippingAddress,
+        paymentStatus: paymentStatus || "Pending",
+        status: status || "Pending"
+      };
+
+      const order = new Order(orderData);
+      await order.save();
+
       return res.status(200).json({
         message: "Purchase successful",
         updatedProducts,
+        order,
       });
     } else {
       // Single product purchase handling
@@ -193,17 +206,36 @@ router.post("/purchase", verifyCustomer, async (req, res) => {
         return res.status(400).json({ message: "Invalid Product ID" });
       }
       const product = await Product.findById(productId);
-      if (!product)
+      if (!product) {
         return res.status(404).json({ message: "Product not found" });
+      }
       if (product.stock < qty) {
         return res.status(400).json({ message: "Insufficient stock" });
       }
+
       product.stock -= qty;
       await product.save();
+
+      const totalAmount = product.price * qty;
+      // Build orderData for single product purchase
+      const orderData = {
+        customerId: req.user.id,
+        sellerId,
+        products: [{ productId: product._id, quantity: qty }],
+        totalAmount,
+        shippingAddress,
+        paymentStatus: paymentStatus || "Pending",
+        status: status || "Pending"
+      };
+
+      const order = new Order(orderData);
+      await order.save();
+
       return res.status(200).json({
         message: "Purchase successful",
         product: product.name,
         remaining_stock: product.stock,
+        order,
       });
     }
   } catch (error) {
