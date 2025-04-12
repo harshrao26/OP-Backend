@@ -20,14 +20,18 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    console.log(name, email, phone, password)
+    console.log(name, email, phone, password);
     email = email.toLowerCase();
-    phone = phone.replace(/\D/g, ''); // Keep digits only
+    phone = phone.replace(/\D/g, ""); // Keep digits only
 
     // Check if customer already exists
-    const existingCustomer = await Customer.findOne({ $or: [{ email }, { phone }] });
+    const existingCustomer = await Customer.findOne({
+      $or: [{ email }, { phone }],
+    });
     if (existingCustomer) {
-      return res.status(400).json({ message: "Email or phone already registered" });
+      return res
+        .status(400)
+        .json({ message: "Email or phone already registered" });
     }
 
     // Hash password
@@ -51,7 +55,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-
 // Customer Login
 router.post("/login", async (req, res) => {
   try {
@@ -70,7 +73,11 @@ router.post("/login", async (req, res) => {
     }
 
     // Generate JWT Token
-    const token = jwt.sign({ id: customer._id, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { id: customer._id, role: "customer" },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.json({ token, customer });
   } catch (error) {
@@ -78,33 +85,34 @@ router.post("/login", async (req, res) => {
   }
 });
 
-
 // User Profile Route
 router.get("/profile", verifyCustomer, async (req, res) => {
   try {
     // Retrieve customer using the id from the token (set by authMiddleware)
-    const customer = await Customer.findById(req.user.id);
-    if (!customer) {
-      return res.status(404).json({ message: "Customer not found" });
-    }
+    const customerProfile = await Customer.findById(req.user.id).select("name email phone");
 
-    // Fetch all orders for the customer
-    const orders = await Order.find({ customerId: req.user.id });
-
-    // Separate orders based on their status
-    const pastOrders = orders.filter(order => order.status === "Delivered");
-    const currentOrders = orders.filter(order => order.status !== "completed");
-
+    const currentOrders = await Order.find({
+      customerId: req.user.id,
+      status: { $ne: "Delivered" },
+    })
+      .populate("products.productId", "name images price")
+      .sort({ createdAt: -1 });
+    
+    const pastOrders = await Order.find({
+      customerId: req.user.id,
+      status: "Delivered",
+    }).populate("products.productId", "name images price");
+    
     res.status(200).json({
-      profile: customer,
+      profile: customerProfile,
+      currentOrders,
       pastOrders,
-      currentOrders
     });
+    
   } catch (error) {
     res.status(500).json({ message: "Internal server error", error });
   }
 });
-
 
 // Forgot Password - send reset link
 router.post("/forgot-password", async (req, res) => {
@@ -118,7 +126,9 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(404).json({ message: "Email not found" });
     }
 
-    const token = jwt.sign({ id: customer._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    const token = jwt.sign({ id: customer._id }, process.env.JWT_SECRET, {
+      expiresIn: "15m",
+    });
 
     const resetLink = `${process.env.CLIENT_URL}/reset-password/${token}`;
     console.log("Reset link generated:", resetLink);
@@ -138,8 +148,6 @@ router.post("/forgot-password", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
-
 
 router.post("/reset-password", async (req, res) => {
   try {
@@ -173,7 +181,5 @@ router.get("/test-mail", async (req, res) => {
     res.status(500).send("Email failed");
   }
 });
-
-
 
 export default router;

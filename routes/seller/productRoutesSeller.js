@@ -101,10 +101,13 @@ router.delete("/delete/:id", verifySeller, async (req, res) => {
   }
 });
 // Get orders for the logged in seller
+// Get orders for the logged in seller
 router.get("/orders", verifySeller, async (req, res) => {
   try {
-    // Find orders where the sellerId matches the logged in seller's ID
-    const orders = await Order.find({ sellerId: req.sellerId });
+    const orders = await Order.find({ sellerId: req.sellerId })
+      .populate("products.productId", "name images price") // populate product info
+      .populate("customerId", "name email"); // optional, good for tracking
+
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

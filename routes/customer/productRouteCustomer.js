@@ -271,14 +271,18 @@ router.get("/:orderId", async (req, res) => {
 });
 
 // List Orders for a Customer
+// List Orders for a Customer
 router.get("/customer/:customerId", verifyCustomer, async (req, res) => {
   try {
-    const orders = await Order.find({ customerId: req.params.customerId });
+    const orders = await Order.find({ customerId: req.user.id })
+  .populate("products.productId", "name images price") // ✅ this is critical
+
     res.status(200).json({ orders });
   } catch (error) {
     res.status(500).json({ message: "Internal server error", error });
   }
 });
+
 
 // Update Order Status (or Payment Status)
 router.put("/:orderId", verifyCustomer, async (req, res) => {
